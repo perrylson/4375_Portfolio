@@ -1,6 +1,5 @@
 /*
 Program reads a csv file; extracts data as numeric vectors; and calculates and displays various statistics
-Created by: Perry Son - PXS190005
 */
 
 #include <fstream>
