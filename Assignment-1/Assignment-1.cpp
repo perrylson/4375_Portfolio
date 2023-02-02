@@ -1,5 +1,6 @@
 /*
 Program reads a csv file; extracts data as numeric vectors; and calculates and displays various statistics
+Created by: Perry Son - PXS190005
 */
 
 #include <fstream>
@@ -50,13 +51,6 @@ void print_stats(vector<double> vec) {
 
 //Function covar calculates the covariance between two numeric vectors
 double covar(vector<double> vecX, vector<double> vecY){
-
-	//Check if vector arguments have the same size
-	if (vecX.size() != vecY.size()) {
-		cout << "Vectors must be of same size for the covariance formula" << endl;
-		return 1;
-	}
-
 	double vecXMean = vec_mean(vecX), vecYMean = vec_mean(vecY), summation = 0;
 
 	for(vector<double>::iterator itrX = vecX.begin(), itrY = vecY.begin(); itrX != vecX.end() && itrY != vecY.end(); (++itrX, ++itrY))
@@ -67,12 +61,6 @@ double covar(vector<double> vecX, vector<double> vecY){
 
 //Function cor calculates the correlation between two numeric vectors
 double cor(vector<double> vecX, vector<double> vecY){
-
-	//Check if vector arguments have the same size
-	if (vecX.size() != vecY.size()) {
-	cout << "Vectors must be of same size for the correlation formula" << endl;
-	return 1;
-	}
 	return covar(vecX, vecY)/(sqrt(covar(vecX, vecX))*sqrt(covar(vecY, vecY)));
 }
 
