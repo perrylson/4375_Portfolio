@@ -34,18 +34,24 @@ double vec_median(vector<double> vec){
 }
 
 //Function vec_range finds the range of a numeric vector
-double vec_range(vector<double> vec){
+double* vec_range(vector<double> vec){
+	static double range_arr[2];
+
 	sort(vec.begin(), vec.end());
 
-	return vec.back()-vec.front();
+	range_arr[0] = vec.front();
+	range_arr[1] = vec.back();
+	return range_arr;
 }
 
 //Function print_stats calls the earlier stat functions and prints various statistics 
 void print_stats(vector<double> vec) {
+    double* range_arr = vec_range(vec);		
+
 	cout << "Sum: " << vec_sum(vec) << endl;
 	cout << "Mean: " << vec_mean(vec) << endl;
 	cout << "Median: " << vec_median(vec) << endl;
-	cout << "Range: " << vec_range(vec) << endl;
+	cout << "Range: " << "[" << range_arr[0] << ", " << range_arr[1] << "]" << endl;
 }
 
 //Function covar calculates the covariance between two numeric vectors
