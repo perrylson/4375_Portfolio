@@ -1,0 +1,186 @@
+---
+title: "Linear Classification"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+By: Perry Son, Waheed Anwar
+
+
+
+### Overview
+Linear classification involves a qualitative target. The linear models work with a dataset of x & y values, which represents the predictors and targets. These models can cleanly separate classes; conduct computationally inexpensive operations; and generate intuitive probabilistic output. However, these models are prone to underfitting. They also cannot capture complex non-linear decision boundaries. 
+
+The data consists of information from the 1994 Census. The dataset can be found on Kaggle(https://www.kaggle.com/datasets/uciml/adult-census-income).  
+
+### Loading Data
+I printed the first 6 observations. Some of the features have values of "?". 
+
+```{r}
+set.seed(1111)
+current_path = rstudioapi::getActiveDocumentContext()$path 
+setwd(dirname(current_path ))
+adult_data <- read.csv("adult.csv")
+head(adult_data)
+```
+
+
+There are 32561 observations.
+```{r}
+nrow(adult_data)
+```
+
+I printed the column names of the data. Most of these features appear to be qualitative. 
+```{r}
+colnames(adult_data)
+```
+
+I checked for NaN's in the data's columns. 
+```{r}
+na_count <-sapply(adult_data, function(y) sum(length(which(is.na(y)))))
+na_count
+```
+
+I also checked for columns with "?" values. There are some observations that contain these specific values.
+```{r}
+question_count <-sapply(adult_data, function(y) sum(length(which(y=="?"))))
+question_count
+```
+I dropped observations that contained a "?" character. 
+```{r}
+adult_data <- adult_data[!(adult_data$occupation=="?"),]
+adult_data <- adult_data[!(adult_data$workclass=="?"),]
+adult_data <- adult_data[!(adult_data$native.country=="?"),]
+
+```
+
+
+The dataset is clearly skewed towards individuals who make less than 50k. Using data augmentation(ex: undersampling, SMOTE) is outside the scope of this assignment. 
+
+```{r}
+adult_data$income<-as.factor(adult_data$income) 
+levels(adult_data$income) <- c('<=50K', '>50K') 
+summary(adult_data$income)
+```
+
+With 80/20 ratio, I split the data into training and test sets.
+```{r}
+i <- sample(1:nrow(adult_data), nrow(adult_data)*0.80, replace=FALSE)
+train <- adult_data[i,]
+test <- adult_data[-i,]
+```
+
+
+### Using R's Built-in Functions for Data Exploration
+
+People's work schedule range from 1 to 99 hours per week.
+
+```{r}
+range(train$hours.per.week)
+```
+
+Average age is 38.
+```{r}
+mean(train$age)
+```
+
+There is barely any correlation between hours-per-week and age. 
+```{r}
+cor(train$hours.per.week, train$age)
+```
+
+Median age is 37 years old.
+```{r}
+median(train$age)
+```
+
+People's age range from 17 to 90 years old.
+```{r}
+range(train$age)
+
+```
+
+### Graphs of Training Data
+
+Not that many people worked for the military. There were similar amounts of executives and repairmen.
+
+```{r}
+barplot(table(train$occupation),  ylab="Frequency", main="Occupations", las = 2,
+        cex.names = 0.65)
+```
+
+Many individuals were married to civilian spouses. However, the 2nd highest bar consisted of non-married individuals. 
+```{r}
+barplot(table(train$marital.status),ylab="Frequency", main="Marital Status", las = 2,
+        cex.names = 0.5)
+```
+People tended to work between 35 and 40 hours.
+```{r}
+hist(train$hours.per.week, main = "Hours per Week", xlab="Hours per week")
+```
+
+### Logistic Regression
+
+Residual deviance is much lower than null deviance. AIC is 15810. 
+
+```{r}
+glm1 <- glm(income~., data=train, family=binomial)
+summary(glm1)
+```
+
+### Naive Bayes
+
+The priors for <=50K and >50K are 0.7498 and 0.25020. Mean age for making around 50K or less is ~36 years old. Mean age for making more than 50K is ~44 years old. 
+
+```{r}
+library(e1071)
+nb1 <- naiveBayes(income~., data=train)
+nb1
+```
+
+### Model Evaluation
+
+The logistic regression model had an accuracy of 0.85. For future work, a weighted accuracy should be used to determine relative importance of false-positive and false-negative errors. 
+
+```{r}
+probs <- predict(glm1, newdata=test, type="response")
+pred <- ifelse(probs>0.5, 2, 1)
+acc1 <- mean(pred==as.integer(test$income))
+print(paste("glm1 accuracy = ", acc1))
+pred <- ifelse(pred==2, ">50K", "<=50K")
+table(pred, test$income)
+```
+The ROC curve shows the trade-off between predicting true and false positives.
+
+```{r}
+library(ROCR)
+pr <- prediction(probs, test$income)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+```
+AUC measures the area under the curve. AUC is 0.90, which is very close to 1.0 (score for a perfect classifier).
+```{r}
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
+
+The Naive Bayes model maintained an accuracy of 0.82. 
+```{r}
+p2 <- predict(nb1, test, type="class")
+tab2 <- table(p2, test$income)
+print(paste("nb1 accuracy = ", sum(diag(tab2)) / sum(tab2)))
+tab2
+```
+
+### Thoughts on Results
+The Naive Bayes model has an accuracy of 0.82, while the logistic regression model has an accuracy of 0.85. Naive Bayes tends to perform better on smaller dataset. Given the large amount of observations, it makes sense for logistic regression to outperform Naive Bayes. This is measured in terms of accuracy. 
+
+### Comparison between Naive Bayes and Logistic Regression
+The strength of Naive Bayes is its assumption regarding independent predictors. Even in a false case, Naive Bayes can still be effective since it performs well on small datasets. Its summary is also very intuitive for human readers.However, a false assumption can negatively impact the performance. Meanwhile, logistic regression works well with binary classification due to qualitative targets. With a larger data set, the logistic regression will fare better than Naive Bayes. This is good for binary classification because it involves independent and dependent variables. The downside of logistic regression can be its high-bias and low-variance nature. It may have the problem of not fitting the data set accurately.
+
+
+### Metrics 
+Accuracy's benefit is its usage as a very simple metric for classification. This metric tells us the ratio of number of correct predictions over the total number of predictions.
+However, accuracy does not scale well with complex tasks. These tasks might require other suitable metrics. For example, we also used ROC and AUC. ROC is involved with the probability curve. AUC represents the area under the curve. For example, if the AUC lies in the range of [0.5, 1], then we can distinguish between these two thresholds. However, if the dataset is not implemented properly, this indicates the presence of falsified data or wide threshold differences. In that case, AUC might not be a suitable metric. 
+
