@@ -1,0 +1,197 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+By: Perry Son
+
+### Overview
+This dataset consists of flight details and passenger surveys. Regarding surveys, passengers rate their experience on a scale of 1 to 5, with 0 being non-applicable. These surveys focused on various aspects of their flight. The dataset records passenger details(e.g., class, type of travel) and flight information(e.g., flight distance, delay). The dataset can be found on Kaggle (https://www.kaggle.com/datasets/teejmahal20/airline-passenger-satisfaction). 
+
+It should be noted that the dataset did not specify the meaning of the scoring system. The notebook assumed that 1 and 5 respectively mapped to worst and best. The dataset also did not indicate the unit of measure for flight distance. The notebook also assumed that distance was measured in miles. 
+
+
+Originally, there were two files: train.csv and test.csv. After I loaded the files, I combined them to perform the same preprocessing techniques. Here, I printed the first 6 observations of the dataset. 
+```{r}
+set.seed(1111)
+current_path = rstudioapi::getActiveDocumentContext()$path 
+setwd(dirname(current_path ))
+data1 <- read.csv("train.csv")
+data2 <- read.csv("test.csv")
+data <- rbind(data1, data2)
+head(data)
+```
+
+### Preprocessing and Data Cleaning
+
+I dropped columns that contained non-essential predictors.
+```{r}
+data <- subset(data, select = -c(X, id))
+```
+
+I mapped the categorical non-numerical predictors to different ranges.  
+```{r}
+data$Customer.Type <- ifelse(data$Customer.Type=="Local Customer", 1, 0)
+data$Gender <- ifelse(data$Gender=="Female", 1, 0)
+data$Type.of.Travel <- ifelse(data$Type.of.Travel=="Business travel", 1, 0)
+data$Class[data$Class == "Eco"] <- 0
+data$Class[data$Class == "Eco Plus"] <- 1
+data$Class[data$Class == "Business"] <- 2
+```
+
+I listed the column names. 
+```{r}
+print(colnames(data))
+```
+
+. I checked which column contained NA's  
+
+```{r}
+print(sapply(data, function(y) sum(length(which(is.na(y))))))
+```
+
+The score of 0 indicated non-applicable reviews. I also checked which survey column contained scores of 0's. 
+```{r}
+print(sapply(data, function(y) sum(length(which(y==0)))))
+```
+
+I dropped observations that contained NA's or scores of 0. 
+```{r}
+data <- data[!(is.na(data$Arrival.Delay.in.Minutes)),]
+data <- data[!(data$Gate.location==0),]
+data <- data[!(data$Food.and.drink==0),]
+data <- data[!(data$Inflight.wifi.service==0),]
+data <- data[!(data$Departure.Arrival.time.convenient==0),]
+data <- data[!(data$Ease.of.Online.booking==0),]
+data <- data[!(data$Online.boarding==0),]
+data <- data[!(data$Seat.comfort==0),]
+data <- data[!(data$Inflight.entertainment==0),]
+data <- data[!(data$On.board.service==0),]
+data <- data[!(data$Leg.room.service==0),]
+data <- data[!(data$Checkin.service==0),]
+data <- data[!(data$Inflight.service==0),]
+data <- data[!(data$Cleanliness==0),]
+```
+
+
+I printed the number of observations in the dataset. There were 119204 observations.
+```{r}
+print(nrow(data))
+```
+
+I converted the satisfaction column to a factor. 
+```{r}
+data$satisfaction<-as.factor(data$satisfaction)
+```
+
+I performed a train/test split with a ratio of 80:20. 
+```{r}
+i <- sample(1:nrow(data), nrow(data)*0.80, replace=FALSE)
+train <- data[i,]
+test <- data[-i,]
+
+```
+There are 95363 training observations. 
+```{r}
+print(nrow(train))
+```
+### Data Exploration
+
+Minimum age was 7 years old. Maximum age was 85 years old. 
+```{r}
+range(train$Age)
+```
+The average flight distance was 1225.62 miles.
+```{r}
+mean(train$Flight.Distance)
+```
+I plotted a histogram of the passengers' age. The ages were centered around the 20's to 60's. 
+```{r}
+hist(train$Age, main = "Passenger's Age", xlab="Age")
+```
+
+
+I plotted a box plot of the flight distance. A majority of flights had a flight distance of ~600 to ~1900 miles. 
+```{r}
+boxplot(train$Flight.Distance,  ylab="Frequency", main="Flight Distance")
+```
+
+I plotted a bar plot of the overall satisfaction level. More passengers were neutral or dissatisfied with their flight experience. 
+```{r}
+barplot(table(train$satisfaction),  ylab="Frequency", main="Satisfaction")
+```
+
+### Machine Learning Models
+I used Logistic Regression, K-nearest neighbors (KNN), and Decision Trees to predict passenger's satisfaction level. The formula used all of the predictors to determine overall flight satisfaction. 
+
+
+I fitted a logistic regression model on the training data. I also printed a summary of the model.
+```{r}
+log_reg_model <- glm(satisfaction~., data=train, family=binomial)
+summary(log_reg_model)
+```
+
+The warning indicates that some predictors are perfectly correlated. Here, I printed the confusion matrix and accuracy. In this case, logistic regression had an accuracy of ~0.89. 
+
+```{r}
+probs <- predict(log_reg_model, newdata=test, type="response")
+pred <- ifelse(probs>0.5, 2, 1)
+acc1 <- mean(pred==as.integer(test$satisfaction))
+pred <- ifelse(pred==2, "satisfied", "neutral or dissatisfied")
+table(pred, test$satisfaction)
+print(paste("logistic reg accuracy = ", acc1))
+```
+
+I fitted the KNN algorithm on the training data. I specified the number of neighbors to be the $\sqrt{N}$/2 with N being the number of training observations. Because there were two classes, I rounded K upward to get an odd number. 
+```{r}
+library(class)
+labels <- ifelse(train$satisfaction=="satisfied", 1, 0)
+k_amt <- ceiling(sqrt(length(labels))/2)
+knn_pred <- knn(train=train[, -23], test=test[,-23],
+cl=labels, k=k_amt)
+```
+
+I printed the confusion matrix and accuracy for KNN. KNN had an accuracy of ~0.71. 
+```{r}
+knn_pred <- ifelse(knn_pred==1, "satisfied", "neutral or dissatisfied")
+acc <- length(which(knn_pred == test$satisfaction)) /length(knn_pred)
+table(knn_pred, test$satisfaction)
+print(paste("K Nearest Neighbors accuracy = ", acc))
+```
+
+I fitted the decision tree algorithm on the training data. I also printed the tree structure. 
+
+Regarding the diagram, decision trees select features that best splits the data. Each node contains a feature and threshold value, which determines the path traversal.  
+```{r}
+library(tree)
+decision_tree <- tree(satisfaction~., data=train)
+par(cex = .3)
+plot(decision_tree)
+text(decision_tree)
+```
+
+I printed the confusion matrix and accuracy for the decision tree. The decision tree had an accuracy of ~0.90. 
+```{r}
+tree_pred <- predict(decision_tree, newdata=test, type="class")
+table(tree_pred, test$satisfaction)
+acc <- mean(tree_pred == test$satisfaction)
+print(paste("Decision Tree accuracy = ", acc))
+
+```
+
+### Thoughts
+
+Logistic Regression creates decision boundaries to partition observations into similar classes. For this dataset,  the survey columns measured satisfaction on a level of 1 to 5. Due to the small set of choices, these columns didn’t simulate any complex non-linear patterns. Logistic Regression assumes the predictor and target variables are linearly related with the log odds. Given that the model achieved an accuracy of ~0.89, the variables already possessed a linear relationship. 
+
+KNN didn’t perform that well with an accuracy of ~0.71. For a given observation, KNN chooses a target class based on proximity to N nearest neighbors. I believe there were some underlying factors that affected overall flight satisfaction. Despite sharing similar values, the observations didn’t incorporate these factors. Hence, KNN had a subpar performance. 
+
+The Decision Tree had the best performance with an accuracy of ~0.9. Since the data rarely varied, the decision tree didn’t suffer from overfitting.  As a result, it performed well on the test set.  
+
+
+
+
+
+
+
+
